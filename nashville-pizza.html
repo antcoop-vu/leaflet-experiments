@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smoky Mountain Pizza Co. - Nashville Locations</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Open+Sans:wght@300;400;600;700&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    .pizza-font {
+      font-family: "Fredoka One", cursive;
+    }
+
+    .body-font {
+      font-family: "Open Sans", sans-serif;
+    }
+
+    .map-container {
+      height: 450px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .pizza-card {
+      transition: all 0.3s ease;
+      background: linear-gradient(145deg, #ffffff, #f8fafc);
+      border: 2px solid transparent;
+    }
+
+    .pizza-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border-color: #ef4444;
+    }
+
+    .pizza-card.selected {
+      border-color: #ef4444;
+      background: linear-gradient(145deg, #fef2f2, #ffffff);
+    }
+
+    .pizza-hero {
+      background: linear-gradient(135deg,
+          #dc2626 0%,
+          #f59e0b 50%,
+          #059669 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .pizza-hero::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="white" opacity="0.1"/><circle cx="80" cy="40" r="1.5" fill="white" opacity="0.1"/><circle cx="40" cy="70" r="1" fill="white" opacity="0.1"/><circle cx="70" cy="80" r="2.5" fill="white" opacity="0.1"/></svg>') repeat;
+    }
+
+    .specialty-badge {
+      background: linear-gradient(45deg, #ef4444, #f97316);
+      color: white;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .contact-form {
+      background: linear-gradient(145deg, #ffffff, #f8fafc);
+      border: 3px solid #f59e0b;
+    }
+
+    .btn-pizza {
+      background: linear-gradient(45deg, #dc2626, #ef4444);
+      transition: all 0.3s ease;
+    }
+
+    .btn-pizza:hover {
+      background: linear-gradient(45deg, #b91c1c, #dc2626);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(220, 38, 38, 0.4);
+    }
+
+    .nav-indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+
+    .hours-badge {
+      background: linear-gradient(45deg, #059669, #10b981);
+      color: white;
+      padding: 0.125rem 0.5rem;
+      border-radius: 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+  </style>
+</head>
+
+<body class="bg-orange-50 body-font">
+  <div x-data="pizzaMap()" class="min-h-screen">
+    <header class="pizza-hero text-white py-20 relative">
+      <div class="container mx-auto px-4 text-center relative z-10">
+        <div class="flex justify-center mb-6">
+          <div class="pizza-icon text-6xl">🍕</div>
+        </div>
+        <h1 class="pizza-font text-5xl md:text-7xl mb-4 text-shadow-lg">
+          Smoky Mountain Pizza Co.
+        </h1>
+        <p class="text-xl md:text-2xl opacity-95 font-light">
+          Nashville's Best Wood-Fired Pizza Since 2015
+        </p>
+        <div class="mt-8 flex justify-center space-x-4">
+          <span class="specialty-badge">🔥 Wood-Fired</span>
+          <span class="specialty-badge">🌱 Farm Fresh</span>
+          <span class="specialty-badge">🎵 Live Music</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="py-12 bg-white border-b-4 border-orange-200">
+      <div class="container mx-auto px-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div>
+            <div class="text-3xl font-bold text-red-600 pizza-font">5</div>
+            <div class="text-gray-600 text-sm">Locations</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-red-600 pizza-font">25+</div>
+            <div class="text-gray-600 text-sm">Pizza Varieties</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-red-600 pizza-font">12</div>
+            <div class="text-gray-600 text-sm">Craft Beers</div>
+          </div>
+          <div>
+            <div class="text-3xl font-bold text-red-600 pizza-font">
+              30min
+            </div>
+            <div class="text-gray-600 text-sm">Avg Delivery</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-16">
+      <div class="container mx-auto px-4">
+        <div class="max-w-7xl mx-auto">
+          <div class="text-center mb-12">
+            <h2 class="pizza-font text-4xl mb-4 text-gray-800">
+              Our Nashville Locations
+            </h2>
+            <p class="text-lg text-gray-600">
+              Find your nearest Smoky Mountain Pizza Co. and taste the
+              difference!
+            </p>
+          </div>
+
+          <div class="mb-16">
+            <div class="text-center mb-6">
+              <h3 class="text-2xl font-semibold text-gray-700 mb-2">
+                🗺️ Interactive Location Map
+              </h3>
+              <p class="text-gray-600">
+                Click on any marker or location card to get details
+              </p>
+            </div>
+            <div id="map" class="map-container mx-auto rounded-md border-4 border-orange-500"></div>
+          </div>
+
+          <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-8 mb-16">
+            <template x-for="location in locations" :key="location.id">
+              <div class="pizza-card rounded-md p-6 shadow-lg cursor-pointer"
+                :class="selectedLocation?.id === location.id ? 'selected' : ''" @click="selectLocation(location)">
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center">
+                    <div class="nav-indicator mr-3"
+                      :class="selectedLocation?.id === location.id ? 'bg-red-500' : 'bg-gray-400'"></div>
+                    <h4 class="text-xl font-bold text-gray-800" x-text="location.name"></h4>
+                  </div>
+                  <div class="text-2xl" x-text="location.emoji"></div>
+                </div>
+
+                <div class="mb-4">
+                  <span class="specialty-badge" x-text="location.specialty"></span>
+                </div>
+
+                <div class="space-y-3 text-gray-600 mb-4">
+                  <div class="flex items-start">
+                    <svg class="w-5 h-5 mr-2 mt-0.5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd"
+                        d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                        clip-rule="evenodd"></path>
+                    </svg>
+                    <p class="text-sm" x-text="location.address"></p>
+                  </div>
+
+                  <div class="flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path
+                        d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z">
+                      </path>
+                    </svg>
+                    <p class="text-sm font-medium" x-text="location.phone"></p>
+                  </div>
+
+                  <div class="flex items-start">
+                    <svg class="w-5 h-5 mr-2 mt-0.5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                        clip-rule="evenodd"></path>
+                    </svg>
+                    <div class="text-sm">
+                      <p x-text="location.hours"></p>
+                      <span class="hours-badge mt-1 inline-block" x-text="location.status"></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4">
+                  <p class="text-sm text-gray-600 leading-relaxed" x-text="location.description"></p>
+                </div>
+
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <template x-for="feature in location.features" :key="feature">
+                    <span class="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full" x-text="feature"></span>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="max-w-3xl mx-auto">
+            <div class="text-center mb-8">
+              <h3 class="pizza-font text-3xl mb-4 text-gray-800">
+                🍕 Get in Touch
+              </h3>
+              <p class="text-gray-600">
+                Questions about catering, private events, or just want to say
+                hi? We'd love to hear from you!
+              </p>
+            </div>
+
+            <form class="contact-form rounded-md p-8 shadow-xl">
+              <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">First Name *</label>
+                  <input type="text" required
+                    class="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all" />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Last Name *</label>
+                  <input type="text" required
+                    class="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all" />
+                </div>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Email *</label>
+                  <input type="email" required
+                    class="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all" />
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Phone</label>
+                  <input type="tel"
+                    class="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all" />
+                </div>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Preferred Location</label>
+                  <select
+                    class="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all">
+                    <option>Select a location</option>
+                    <template x-for="location in locations" :key="location.id">
+                      <option x-text="location.name"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-semibold text-gray-700 mb-2">Inquiry Type</label>
+                  <select
+                    class="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all">
+                    <option>General Question</option>
+                    <option>Catering Request</option>
+                    <option>Private Event</option>
+                    <option>Feedback</option>
+                    <option>Job Application</option>
+                    <option>Partnership</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Message *</label>
+                <textarea rows="5" required
+                  class="w-full px-4 py-3 border-2 border-orange-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                  placeholder="Tell us about your catering needs, event details, or any questions you have..."></textarea>
+              </div>
+
+              <div class="text-center">
+                <button type="submit"
+                  class="btn-pizza text-white font-bold py-4 px-8 rounded-lg shadow-lg inline-flex items-center space-x-2">
+                  <span>🍕</span>
+                  <span>Send Message</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="bg-gray-800 text-white py-12">
+      <div class="container mx-auto px-4 text-center">
+        <div class="pizza-font text-2xl mb-4">Smoky Mountain Pizza Co.</div>
+        <p class="text-gray-400 mb-4">
+          Serving Nashville with passion since 2015
+        </p>
+        <div class="flex justify-center space-x-6 text-sm">
+          <a href="#" class="hover:text-orange-400 transition-colors">About Us</a>
+          <a href="#" class="hover:text-orange-400 transition-colors">Menu</a>
+          <a href="#" class="hover:text-orange-400 transition-colors">Careers</a>
+          <a href="#" class="hover:text-orange-400 transition-colors">Franchise</a>
+        </div>
+        <div class="mt-6 text-gray-500 text-sm">
+          © 2025 Smoky Mountain Pizza Co. All rights reserved.
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    function pizzaMap() {
+      return {
+        map: null,
+        markers: {},
+        selectedLocation: null,
+        locations: [
+          {
+            id: 1,
+            name: "Downtown Nashville",
+            emoji: "🏙️",
+            address: "312 Broadway, Nashville, TN 37201",
+            phone: "(615) 555-PIZZA",
+            hours: "Sun-Thu: 11am-11pm, Fri-Sat: 11am-1am",
+            status: "Open Now",
+            specialty: "🎵 Live Music",
+            description:
+              "Our flagship location in the heart of Music City! Enjoy live music every night while savoring our signature Nashville Hot Pizza. Perfect for tourists and locals alike.",
+            features: [
+              "Live Music",
+              "Late Night",
+              "Outdoor Seating",
+              "Downtown Parking",
+            ],
+            lat: 36.1627,
+            lng: -86.7816,
+          },
+          {
+            id: 2,
+            name: "Music Row",
+            emoji: "🎸",
+            address: "1825 Division St, Nashville, TN 37203",
+            phone: "(615) 555-SLICE",
+            hours: "Daily: 11am-10pm",
+            status: "Open Now",
+            specialty: "🎸 Recording Studio Vibes",
+            description:
+              "Located in the famous Music Row district, our studio-themed location features gold records on the walls and pizza named after country legends. A must-visit for music lovers!",
+            features: [
+              "Music Memorabilia",
+              "Industry Hangout",
+              "Private Booths",
+              "Songwriter Specials",
+            ],
+            lat: 36.1506,
+            lng: -86.7977,
+          },
+          {
+            id: 3,
+            name: "The Gulch",
+            emoji: "🏢",
+            address: "900 Division St, Nashville, TN 37203",
+            phone: "(615) 555-WOOD",
+            hours: "Mon-Thu: 4pm-10pm, Fri-Sun: 11am-11pm",
+            status: "Open Now",
+            specialty: "🍷 Wine & Dine",
+            description:
+              "Our upscale location in The Gulch offers craft cocktails, an extensive wine list, and our premium artisan pizza menu. Perfect for date nights and business dinners.",
+            features: [
+              "Craft Cocktails",
+              "Wine Bar",
+              "Upscale Dining",
+              "Valet Parking",
+            ],
+            lat: 36.154,
+            lng: -86.7767,
+          },
+          {
+            id: 4,
+            name: "Green Hills",
+            emoji: "🛍️",
+            address: "4004 Hillsboro Pike, Nashville, TN 37215",
+            phone: "(615) 555-FRESH",
+            hours: "Daily: 11am-9pm",
+            status: "Open Now",
+            specialty: "👨‍👩‍👧‍👦 Family Friendly",
+            description:
+              "Our family-friendly location near Green Hills Mall features a kids play area, arcade games, and our famous build-your-own pizza bar. Great for birthday parties and family gatherings!",
+            features: [
+              "Kids Play Area",
+              "Arcade Games",
+              "Birthday Parties",
+              "Mall Proximity",
+            ],
+            lat: 36.1059,
+            lng: -86.8153,
+          },
+          {
+            id: 5,
+            name: "East Nashville",
+            emoji: "🎨",
+            address: "1200 Woodland St, Nashville, TN 37206",
+            phone: "(615) 555-EAST",
+            hours: "Tue-Sun: 5pm-10pm (Closed Mondays)",
+            status: "Opens at 5pm",
+            specialty: "🎨 Local Art Gallery",
+            description:
+              "Our artsy East Nashville location doubles as a local art gallery, featuring rotating exhibits from Nashville artists. Enjoy unique pizzas inspired by the creative community while supporting local art!",
+            features: [
+              "Art Gallery",
+              "Local Artists",
+              "Creative Menu",
+              "Community Events",
+            ],
+            lat: 36.1742,
+            lng: -86.7325,
+          },
+        ],
+
+        init() {
+          this.$nextTick(() => {
+            this.initMap();
+            this.addMarkers();
+          });
+        },
+
+        initMap() {
+          this.map = L.map("map").setView([36.1627, -86.7816], 11);
+
+          L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution:
+              '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+          }).addTo(this.map);
+        },
+
+        addMarkers() {
+          this.locations.forEach((location) => {
+            const icon = L.divIcon({
+              className: "custom-pizza-marker",
+              html: `
+                                <div class="relative">
+                                    <div class="bg-red-500 text-white rounded-full w-10 h-10 flex items-center justify-center shadow-xl border-3 border-white transform hover:scale-110 transition-transform">
+                                        <div class="text-lg">🍕</div>
+                                    </div>
+                                    <div class="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-red-500"></div>
+                                </div>
+                            `,
+              iconSize: [40, 50],
+              iconAnchor: [20, 50],
+              popupAnchor: [0, -50],
+            });
+
+            const marker = L.marker([location.lat, location.lng], {
+              icon,
+            }).addTo(this.map);
+
+            const popupContent = `
+                            <div class="p-4 min-w-64">
+                                <div class="flex items-center mb-3">
+                                    <div class="text-2xl mr-2">${location.emoji}</div>
+                                    <h3 class="font-bold text-lg text-gray-800">${location.name}</h3>
+                                </div>
+                                <div class="mb-2">
+                                    <span class="specialty-badge">${location.specialty}</span>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">${location.address}</p>
+                                <p class="text-sm font-medium text-green-600 mb-2">${location.phone}</p>
+                                <p class="text-sm text-gray-600 mb-2">${location.hours}</p>
+                                <div class="text-xs">
+                                    <span class="hours-badge">${location.status}</span>
+                                </div>
+                            </div>
+                        `;
+
+            marker.bindPopup(popupContent, {
+              maxWidth: 300,
+              className: "pizza-popup",
+            });
+
+            marker.on("click", () => {
+              this.selectLocation(location);
+            });
+
+            this.markers[location.id] = marker;
+          });
+        },
+
+        selectLocation(location) {
+          this.selectedLocation = location;
+
+          this.map.setView([location.lat, location.lng], 14, {
+            animate: true,
+            duration: 1,
+          });
+
+          this.markers[location.id].openPopup();
+
+          document.getElementById("map").scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        },
+      };
+    }
+  </script>
+</body>
+
+</html>

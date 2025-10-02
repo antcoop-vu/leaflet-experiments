@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nashville Traffic Incidents Dashboard - Metro PD</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet" />
+
+  <style>
+    .dashboard-font {
+      font-family: "Inter", sans-serif;
+    }
+
+    .mono-font {
+      font-family: "JetBrains Mono", monospace;
+    }
+
+    .map-container {
+      height: 600px;
+      border-radius: 0.75rem;
+      overflow: hidden;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border: 2px solid #374151;
+    }
+
+    .incident-card {
+      transition: all 0.3s ease;
+      border-left: 4px solid transparent;
+    }
+
+    .incident-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+        0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .incident-card.selected {
+      border-left-color: #3b82f6;
+      background: linear-gradient(135deg, #eff6ff, #ffffff);
+    }
+
+    .incident-card.high-priority {
+      border-left-color: #dc2626;
+    }
+
+    .incident-card.medium-priority {
+      border-left-color: #f59e0b;
+    }
+
+    .incident-card.low-priority {
+      border-left-color: #10b981;
+    }
+
+    .dashboard-header {
+      background: linear-gradient(135deg,
+          #1f2937 0%,
+          #374151 50%,
+          #4b5563 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .dashboard-header::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="10" y="10" width="2" height="2" fill="white" opacity="0.05"/><rect x="30" y="20" width="1" height="1" fill="white" opacity="0.05"/><rect x="60" y="30" width="1.5" height="1.5" fill="white" opacity="0.05"/><rect x="80" y="40" width="1" height="1" fill="white" opacity="0.05"/></svg>') repeat;
+    }
+
+    .priority-badge {
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .priority-high {
+      background: linear-gradient(45deg, #dc2626, #ef4444);
+      color: white;
+    }
+
+    .priority-medium {
+      background: linear-gradient(45deg, #f59e0b, #fbbf24);
+      color: white;
+    }
+
+    .priority-low {
+      background: linear-gradient(45deg, #10b981, #34d399);
+      color: white;
+    }
+
+    .status-badge {
+      padding: 0.125rem 0.5rem;
+      border-radius: 0.375rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+
+    .status-active {
+      background-color: #fef2f2;
+      color: #dc2626;
+      border: 1px solid #fecaca;
+    }
+
+    .status-investigating {
+      background-color: #fffbeb;
+      color: #f59e0b;
+      border: 1px solid #fed7aa;
+    }
+
+    .status-cleared {
+      background-color: #f0fdf4;
+      color: #16a34a;
+      border: 1px solid #bbf7d0;
+    }
+
+    .metric-card {
+      background: linear-gradient(135deg, #ffffff, #f8fafc);
+      border: 1px solid #e5e7eb;
+      transition: all 0.3s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+    }
+
+    .filter-tab {
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .filter-tab.active {
+      background: linear-gradient(45deg, #3b82f6, #2563eb);
+      color: white;
+    }
+
+    .incident-details {
+      background: linear-gradient(135deg, #f8fafc, #ffffff);
+      border: 2px solid #e5e7eb;
+    }
+
+    .timestamp {
+      color: #6b7280;
+      font-size: 0.875rem;
+    }
+
+    .report-section {
+      background: #f9fafb;
+      border-left: 3px solid #3b82f6;
+    }
+
+    .blink {
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      50% {
+        opacity: 1;
+      }
+
+      51%,
+      100% {
+        opacity: 0.3;
+      }
+    }
+
+    .live-indicator {
+      background: #ef4444;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.2);
+        opacity: 0.7;
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+
+<body class="bg-gray-100 dashboard-font">
+  <div x-data="trafficDashboard()" class="min-h-screen">
+    <header class="dashboard-header text-white py-8 relative">
+      <div class="container mx-auto px-4 relative z-10">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+              <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"></path>
+              </svg>
+            </div>
+            <div>
+              <h1 class="text-3xl font-bold">Nashville Traffic Incidents</h1>
+              <p class="text-gray-300">
+                Metro Nashville Police Department - Real-time Dashboard
+              </p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-6">
+            <div class="flex items-center space-x-2">
+              <div class="live-indicator"></div>
+              <span class="text-sm font-medium">LIVE</span>
+            </div>
+            <div class="text-right">
+              <div class="text-lg font-semibold mono-font" x-text="currentTime"></div>
+              <div class="text-sm text-gray-300">Nashville, TN</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <section class="py-8 bg-white border-b">
+      <div class="container mx-auto px-4">
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6">
+          <div class="metric-card rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-red-600" x-text="metrics.active"></div>
+            <div class="text-sm text-gray-600">Active Incidents</div>
+          </div>
+          <div class="metric-card rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-orange-600" x-text="metrics.investigating"></div>
+            <div class="text-sm text-gray-600">Under Investigation</div>
+          </div>
+          <div class="metric-card rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-green-600" x-text="metrics.cleared"></div>
+            <div class="text-sm text-gray-600">Cleared Today</div>
+          </div>
+          <div class="metric-card rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-blue-600" x-text="metrics.avgResponse"></div>
+            <div class="text-sm text-gray-600">Avg Response</div>
+          </div>
+          <div class="metric-card rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-purple-600" x-text="metrics.officers"></div>
+            <div class="text-sm text-gray-600">Officers On Duty</div>
+          </div>
+          <div class="metric-card rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-indigo-600" x-text="metrics.units"></div>
+            <div class="text-sm text-gray-600">Units Deployed</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="py-8">
+      <div class="container mx-auto px-4">
+        <div class="grid lg:grid-cols-3 gap-8">
+          <div class="lg:col-span-2">
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+              <div class="flex items-center justify-between mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">
+                  Live Incident Map
+                </h2>
+                <div class="flex space-x-2">
+                  <button class="filter-tab px-3 py-1 rounded-md text-sm font-medium"
+                    :class="activeFilter === 'all' ? 'active' : 'bg-gray-200 text-gray-700'" @click="setFilter('all')">
+                    All
+                  </button>
+                  <button class="filter-tab px-3 py-1 rounded-md text-sm font-medium"
+                    :class="activeFilter === 'high' ? 'active' : 'bg-gray-200 text-gray-700'"
+                    @click="setFilter('high')">
+                    High Priority
+                  </button>
+                  <button class="filter-tab px-3 py-1 rounded-md text-sm font-medium"
+                    :class="activeFilter === 'active' ? 'active' : 'bg-gray-200 text-gray-700'"
+                    @click="setFilter('active')">
+                    Active
+                  </button>
+                </div>
+              </div>
+              <div id="map" class="map-container"></div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-1">
+            <div class="bg-white rounded-xl p-6 shadow-lg">
+              <h3 class="text-xl font-bold text-gray-800 mb-6">
+                Recent Incidents
+              </h3>
+              <div class="space-y-4 max-h-96 overflow-y-auto">
+                <template x-for="incident in filteredIncidents" :key="incident.id">
+                  <div class="incident-card rounded-lg p-4 cursor-pointer bg-gray-50"
+                    :class="`${incident.priority}-priority ${selectedIncident?.id === incident.id ? 'selected' : ''}`"
+                    @click="selectIncident(incident)">
+                    <div class="flex items-start justify-between mb-3">
+                      <div class="flex items-center space-x-2">
+                        <span class="priority-badge" :class="`priority-${incident.priority}`"
+                          x-text="incident.priority.toUpperCase()"></span>
+                        <span class="status-badge" :class="`status-${incident.status}`"
+                          x-text="incident.status.toUpperCase()"></span>
+                      </div>
+                      <div class="text-xs text-gray-500 mono-font" x-text="incident.time"></div>
+                    </div>
+
+                    <h4 class="font-semibold text-gray-800 mb-2" x-text="incident.type"></h4>
+                    <p class="text-sm text-gray-600 mb-2" x-text="incident.location"></p>
+                    <p class="text-xs text-gray-500" x-text="incident.description"></p>
+
+                    <div class="mt-3 flex items-center justify-between text-xs">
+                      <span class="text-gray-500">Unit:
+                        <span class="mono-font font-medium" x-text="incident.unit"></span></span>
+                      <span class="text-gray-500">ID:
+                        <span class="mono-font" x-text="incident.caseNumber"></span></span>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div x-show="selectedIncident" class="mt-8">
+          <div class="bg-white rounded-xl p-8 shadow-lg incident-details">
+            <template x-if="selectedIncident">
+              <div>
+                <div class="flex items-center justify-between mb-6">
+                  <div class="flex items-center space-x-4">
+                    <h3 class="text-2xl font-bold text-gray-800">
+                      Incident Report
+                    </h3>
+                    <span class="priority-badge" :class="`priority-${selectedIncident.priority}`"
+                      x-text="selectedIncident.priority.toUpperCase()"></span>
+                    <span class="status-badge" :class="`status-${selectedIncident.status}`"
+                      x-text="selectedIncident.status.toUpperCase()"></span>
+                  </div>
+                  <button @click="selectedIncident = null" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                      </path>
+                    </svg>
+                  </button>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-8">
+                  <div class="md:col-span-2">
+                    <div class="report-section rounded-lg p-6 mb-6">
+                      <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        Incident Details
+                      </h4>
+                      <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Case Number</label>
+                          <p class="mono-font text-gray-800" x-text="selectedIncident.caseNumber"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Incident Type</label>
+                          <p class="text-gray-800" x-text="selectedIncident.type"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Date & Time</label>
+                          <p class="text-gray-800" x-text="selectedIncident.fullDateTime"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Responding Unit</label>
+                          <p class="mono-font text-gray-800" x-text="selectedIncident.unit"></p>
+                        </div>
+                        <div class="md:col-span-2">
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Location</label>
+                          <p class="text-gray-800" x-text="selectedIncident.location"></p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="report-section rounded-lg p-6 mb-6">
+                      <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        Official Report
+                      </h4>
+                      <div class="space-y-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-2">Initial Description</label>
+                          <p class="text-gray-800 leading-relaxed" x-text="selectedIncident.fullReport.initial"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-2">Investigation Findings</label>
+                          <p class="text-gray-800 leading-relaxed" x-text="selectedIncident.fullReport.findings"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-2">Current Status</label>
+                          <p class="text-gray-800 leading-relaxed" x-text="selectedIncident.fullReport.currentStatus">
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="report-section rounded-lg p-6">
+                      <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        Traffic Impact
+                      </h4>
+                      <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Lanes Affected</label>
+                          <p class="text-gray-800" x-text="selectedIncident.trafficImpact.lanesAffected"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Estimated Delay</label>
+                          <p class="text-gray-800" x-text="selectedIncident.trafficImpact.estimatedDelay"></p>
+                        </div>
+                        <div class="md:col-span-2">
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Alternate Routes</label>
+                          <p class="text-gray-800" x-text="selectedIncident.trafficImpact.alternateRoutes"></p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div class="bg-gray-50 rounded-lg p-6">
+                      <h4 class="text-lg font-semibold text-gray-800 mb-4">
+                        Quick Stats
+                      </h4>
+                      <div class="space-y-4">
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Response Time</label>
+                          <p class="text-2xl font-bold text-blue-600" x-text="selectedIncident.responseTime"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Duration</label>
+                          <p class="text-lg font-semibold text-gray-800" x-text="selectedIncident.duration"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Vehicles Involved</label>
+                          <p class="text-lg font-semibold text-gray-800" x-text="selectedIncident.vehiclesInvolved"></p>
+                        </div>
+                        <div>
+                          <label class="block text-sm font-medium text-gray-600 mb-1">Injuries</label>
+                          <p class="text-lg font-semibold"
+                            :class="selectedIncident.injuries > 0 ? 'text-red-600' : 'text-green-600'"
+                            x-text="selectedIncident.injuries > 0 ? selectedIncident.injuries : 'None reported'"></p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script>
+    function trafficDashboard() {
+      return {
+        map: null,
+        markers: {},
+        selectedIncident: null,
+        activeFilter: "all",
+        currentTime: "",
+
+        metrics: {
+          active: 8,
+          investigating: 3,
+          cleared: 24,
+          avgResponse: "4.2min",
+          officers: 156,
+          units: 42,
+        },
+
+        incidents: [
+          {
+            id: 1,
+            caseNumber: "NP24-100234",
+            type: "Multi-Vehicle Accident",
+            location: "I-40 East at Exit 209 (Hermitage)",
+            description:
+              "Three-vehicle collision blocking right lane, possible injuries",
+            priority: "high",
+            status: "active",
+            time: "14:23",
+            fullDateTime: "October 2, 2025 - 2:23 PM CDT",
+            unit: "UNIT-7214",
+            lat: 36.1864,
+            lng: -86.6833,
+            responseTime: "3.2min",
+            duration: "45min",
+            vehiclesInvolved: 3,
+            injuries: 2,
+            fullReport: {
+              initial:
+                "Received 911 call at 14:20 reporting a multi-vehicle collision on I-40 East near Hermitage exit. Caller reported possible injuries and heavy traffic backup. Initial units dispatched at 14:21.",
+              findings:
+                "Upon arrival, officers found a three-vehicle chain reaction collision. Vehicle 1 (2019 Honda Civic) rear-ended Vehicle 2 (2021 Toyota Camry) which then struck Vehicle 3 (2020 Ford F-150). Two occupants from the Honda Civic complained of neck pain and were transported to Vanderbilt University Medical Center for evaluation.",
+              currentStatus:
+                "EMS has cleared the scene. Tow trucks are removing damaged vehicles. Right lane remains blocked while debris is cleared. Investigation ongoing to determine primary cause of accident.",
+            },
+            trafficImpact: {
+              lanesAffected: "1 of 3 lanes (right lane)",
+              estimatedDelay: "15-20 minutes",
+              alternateRoutes:
+                "Use I-24 North to I-40 West or take Old Hickory Blvd as alternate route",
+            },
+          },
+          {
+            id: 2,
+            caseNumber: "NP24-100235",
+            type: "Vehicle Fire",
+            location: "Briley Parkway North near Opryland Drive",
+            description: "Semi-truck engine fire, all lanes blocked",
+            priority: "high",
+            status: "investigating",
+            time: "14:45",
+            fullDateTime: "October 2, 2025 - 2:45 PM CDT",
+            unit: "UNIT-7108",
+            lat: 36.2142,
+            lng: -86.6928,
+            responseTime: "2.8min",
+            duration: "25min",
+            vehiclesInvolved: 1,
+            injuries: 0,
+            fullReport: {
+              initial:
+                "Report of semi-truck fire on Briley Parkway North. Driver safely evacuated vehicle before flames spread. Nashville Fire Department and Metro Police responded immediately.",
+              findings:
+                "Semi-truck carrying auto parts experienced engine fire. Driver noticed smoke and pulled over safely. No hazardous materials involved. Fire suppressed by NFD within 10 minutes of arrival.",
+              currentStatus:
+                "Fire extinguished. Investigating cause of mechanical failure. Waiting for heavy-duty tow truck to remove disabled vehicle. Expect road closure for another 30 minutes.",
+            },
+            trafficImpact: {
+              lanesAffected: "All northbound lanes",
+              estimatedDelay: "30-45 minutes",
+              alternateRoutes:
+                "Take I-65 North to I-24 East or use surface streets through Donelson",
+            },
+          },
+          {
+            id: 3,
+            caseNumber: "NP24-100236",
+            type: "Stalled Vehicle",
+            location: "I-65 South at Harding Place",
+            description:
+              "Disabled vehicle in left lane, driver assistance needed",
+            priority: "medium",
+            status: "active",
+            time: "15:02",
+            fullDateTime: "October 2, 2025 - 3:02 PM CDT",
+            unit: "UNIT-7156",
+            lat: 36.0889,
+            lng: -86.8153,
+            responseTime: "5.1min",
+            duration: "12min",
+            vehiclesInvolved: 1,
+            injuries: 0,
+            fullReport: {
+              initial:
+                "Motorist called for assistance with disabled vehicle on I-65 South. Vehicle lost power and driver unable to move to shoulder safely.",
+              findings:
+                "Vehicle experiencing alternator failure. Driver is safe inside vehicle with hazard lights activated. Traffic flowing around disabled vehicle with caution.",
+              currentStatus:
+                "Officer on scene providing traffic control. Tow truck en route, ETA 10 minutes. Driver has declined medical assistance.",
+            },
+            trafficImpact: {
+              lanesAffected: "1 of 4 lanes (left lane)",
+              estimatedDelay: "5-10 minutes",
+              alternateRoutes:
+                "Traffic flowing in remaining lanes. No alternate route necessary.",
+            },
+          },
+          {
+            id: 4,
+            caseNumber: "NP24-100237",
+            type: "Road Construction",
+            location:
+              "Charlotte Avenue between 37th Ave and White Bridge Road",
+            description:
+              "Emergency utility repair, lane restrictions in effect",
+            priority: "medium",
+            status: "active",
+            time: "13:30",
+            fullDateTime: "October 2, 2025 - 1:30 PM CDT",
+            unit: "UNIT-7201",
+            lat: 36.1581,
+            lng: -86.8419,
+            responseTime: "1.5min",
+            duration: "3hr 15min",
+            vehiclesInvolved: 0,
+            injuries: 0,
+            fullReport: {
+              initial:
+                "Nashville Electric Service reported emergency gas line repair required on Charlotte Avenue. Metro Public Works coordinating with utility crews for lane closures.",
+              findings:
+                "Gas leak detected during routine maintenance. NES crews working to isolate and repair damaged line. Area secured and traffic control measures implemented.",
+              currentStatus:
+                "Repair work 75% complete. One lane of traffic maintained in each direction. Work expected to complete by 6:00 PM.",
+            },
+            trafficImpact: {
+              lanesAffected: "2 of 4 lanes (1 each direction)",
+              estimatedDelay: "10-15 minutes",
+              alternateRoutes:
+                "Use West End Avenue or I-40 to I-440 as alternate routes",
+            },
+          },
+          {
+            id: 5,
+            caseNumber: "NP24-100238",
+            type: "Traffic Signal Malfunction",
+            location: "Intersection of Broadway and 21st Avenue",
+            description: "Traffic signal dark, officer directing traffic",
+            priority: "medium",
+            status: "investigating",
+            time: "14:55",
+            fullDateTime: "October 2, 2025 - 2:55 PM CDT",
+            unit: "UNIT-7089",
+            lat: 36.1515,
+            lng: -86.8025,
+            responseTime: "6.2min",
+            duration: "35min",
+            vehiclesInvolved: 0,
+            injuries: 0,
+            fullReport: {
+              initial:
+                "Traffic signal malfunction reported at busy intersection near Vanderbilt University. Signal completely dark, creating traffic backup during peak hours.",
+              findings:
+                "Power surge from nearby construction caused signal controller failure. Metro Traffic and Electrical Division notified for emergency repair.",
+              currentStatus:
+                "Officer manually directing traffic at intersection. Electrical crew on scene working to restore signal operation. Temporary stop signs being installed as backup.",
+            },
+            trafficImpact: {
+              lanesAffected: "All approach lanes",
+              estimatedDelay: "8-12 minutes",
+              alternateRoutes:
+                "Use West End Avenue or take 17th/18th Avenue to bypass intersection",
+            },
+          },
+          {
+            id: 6,
+            caseNumber: "NP24-100239",
+            type: "Minor Fender Bender",
+            location: "Gallatin Pike near Trinity Lane",
+            description: "Two-vehicle minor collision, no injuries reported",
+            priority: "low",
+            status: "cleared",
+            time: "13:45",
+            fullDateTime: "October 2, 2025 - 1:45 PM CDT",
+            unit: "UNIT-7178",
+            lat: 36.1998,
+            lng: -86.7489,
+            responseTime: "4.8min",
+            duration: "25min",
+            vehiclesInvolved: 2,
+            injuries: 0,
+            fullReport: {
+              initial:
+                "Minor collision between two passenger vehicles at intersection. Both drivers reported no injuries and vehicles driveable.",
+              findings:
+                "Vehicle 1 failed to yield right of way while turning left, resulting in minor contact with Vehicle 2. Minimal damage to both vehicles, no hazardous materials or debris.",
+              currentStatus:
+                "Incident cleared. Drivers exchanged insurance information. No citations issued. Vehicles moved to parking lot for documentation.",
+            },
+            trafficImpact: {
+              lanesAffected: "None - moved to parking lot",
+              estimatedDelay: "No delay",
+              alternateRoutes: "Not applicable - incident cleared",
+            },
+          },
+          {
+            id: 7,
+            caseNumber: "NP24-100240",
+            type: "Debris in Roadway",
+            location: "I-24 West near Harding Place Exit",
+            description: "Large tire debris blocking center lane",
+            priority: "medium",
+            status: "active",
+            time: "15:12",
+            fullDateTime: "October 2, 2025 - 3:12 PM CDT",
+            unit: "UNIT-7134",
+            lat: 36.1022,
+            lng: -86.8331,
+            responseTime: "3.7min",
+            duration: "8min",
+            vehiclesInvolved: 0,
+            injuries: 0,
+            fullReport: {
+              initial:
+                "Multiple motorists reported large truck tire in center lane of I-24 West. Potential hazard to traffic flow and vehicle damage.",
+              findings:
+                "Semi-truck tire separated from vehicle earlier, came to rest in center travel lane. No associated vehicle found in immediate area.",
+              currentStatus:
+                "Officer on scene with emergency lights activated. TDOT cleanup crew en route to remove debris safely. Traffic merging around obstruction.",
+            },
+            trafficImpact: {
+              lanesAffected: "1 of 3 lanes (center lane)",
+              estimatedDelay: "3-5 minutes",
+              alternateRoutes: "Traffic flowing in left and right lanes",
+            },
+          },
+          {
+            id: 8,
+            caseNumber: "NP24-100241",
+            type: "Police Investigation",
+            location: "Nolensville Pike near Antioch Pike",
+            description: "Active investigation, temporary road closure",
+            priority: "high",
+            status: "investigating",
+            time: "14:10",
+            fullDateTime: "October 2, 2025 - 2:10 PM CDT",
+            unit: "UNIT-7067",
+            lat: 36.0642,
+            lng: -86.6753,
+            responseTime: "2.1min",
+            duration: "1hr 25min",
+            vehiclesInvolved: 0,
+            injuries: 0,
+            fullReport: {
+              initial:
+                "Active police investigation requiring temporary road closure for public safety. Multiple units on scene securing area.",
+              findings:
+                "Investigation involves serious traffic violation with potential criminal charges. Scene processing requires extended time for evidence collection.",
+              currentStatus:
+                "Investigation ongoing. Road closure expected to continue for approximately 30 more minutes. Traffic being diverted to alternate routes.",
+            },
+            trafficImpact: {
+              lanesAffected: "All lanes both directions",
+              estimatedDelay: "20-30 minutes",
+              alternateRoutes:
+                "Use Murfreesboro Pike or take I-24 to I-40 East as alternate route",
+            },
+          },
+        ],
+
+        init() {
+          this.updateTime();
+          setInterval(() => this.updateTime(), 1000);
+
+          this.$nextTick(() => {
+            this.initMap();
+            this.addMarkers();
+          });
+        },
+
+        get filteredIncidents() {
+          if (this.activeFilter === "all") return this.incidents;
+          if (this.activeFilter === "high")
+            return this.incidents.filter((i) => i.priority === "high");
+          if (this.activeFilter === "active")
+            return this.incidents.filter((i) => i.status === "active");
+          return this.incidents;
+        },
+
+        updateTime() {
+          const now = new Date();
+          this.currentTime = now.toLocaleTimeString("en-US", {
+            hour12: false,
+            timeZone: "America/Chicago",
+          });
+        },
+
+        initMap() {
+          this.map = L.map("map").setView([36.1627, -86.7816], 11);
+
+          L.tileLayer(
+            "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+            {
+              attribution:
+                '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+              subdomains: "abcd",
+              maxZoom: 19,
+            }
+          ).addTo(this.map);
+        },
+
+        addMarkers() {
+          this.incidents.forEach((incident) => {
+            let iconColor, iconText;
+
+            if (incident.priority === "high") {
+              iconColor = "#dc2626";
+              iconText = "⚠️";
+            } else if (incident.priority === "medium") {
+              iconColor = "#f59e0b";
+              iconText = "⚡";
+            } else {
+              iconColor = "#10b981";
+              iconText = "ℹ️";
+            }
+
+            if (incident.status === "cleared") {
+              iconColor = "#6b7280";
+              iconText = "✓";
+            }
+
+            const icon = L.divIcon({
+              className: "custom-emergency-marker",
+              html: `
+                                <div class="relative">
+                                    <div class="bg-white rounded-full w-12 h-12 flex items-center justify-center shadow-xl border-3 transform hover:scale-110 transition-transform"
+                                         style="border-color: ${iconColor};">
+                                        <div class="text-lg">${iconText}</div>
+                                    </div>
+                                    ${incident.status === "active"
+                  ? '<div class="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full animate-pulse"></div>'
+                  : ""
+                }
+                                    <div class="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-6 border-l-transparent border-r-transparent" 
+                                         style="border-top-color: ${iconColor};"></div>
+                                </div>
+                            `,
+              iconSize: [48, 60],
+              iconAnchor: [24, 60],
+              popupAnchor: [0, -60],
+            });
+
+            const marker = L.marker([incident.lat, incident.lng], {
+              icon,
+            }).addTo(this.map);
+
+            const popupContent = `
+                            <div class="p-4 min-w-72">
+                                <div class="flex items-center justify-between mb-3">
+                                    <h3 class="font-bold text-lg text-gray-800">${incident.type
+              }</h3>
+                                    <div class="flex space-x-1">
+                                        <span class="priority-badge priority-${incident.priority
+              }">${incident.priority.toUpperCase()}</span>
+                                        <span class="status-badge status-${incident.status
+              }">${incident.status.toUpperCase()}</span>
+                                    </div>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">${incident.location
+              }</p>
+                                <p class="text-sm text-gray-700 mb-3">${incident.description
+              }</p>
+                                <div class="grid grid-cols-2 gap-4 text-xs">
+                                    <div>
+                                        <span class="text-gray-500">Time:</span>
+                                        <div class="font-medium mono-font">${incident.time
+              }</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Unit:</span>
+                                        <div class="font-medium mono-font">${incident.unit
+              }</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Case:</span>
+                                        <div class="font-medium mono-font">${incident.caseNumber
+              }</div>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Duration:</span>
+                                        <div class="font-medium">${incident.duration
+              }</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+
+            marker.bindPopup(popupContent, {
+              maxWidth: 350,
+              className: "emergency-popup",
+            });
+
+            marker.on("click", () => {
+              this.selectIncident(incident);
+            });
+
+            this.markers[incident.id] = marker;
+          });
+        },
+
+        selectIncident(incident) {
+          this.selectedIncident = incident;
+
+          this.map.setView([incident.lat, incident.lng], 14, {
+            animate: true,
+            duration: 1,
+          });
+
+          this.markers[incident.id].openPopup();
+
+          setTimeout(() => {
+            document.querySelector(".incident-details")?.scrollIntoView({
+              behavior: "smooth",
+              block: "start",
+            });
+          }, 500);
+        },
+
+        setFilter(filter) {
+          this.activeFilter = filter;
+          this.selectedIncident = null;
+
+          this.incidents.forEach((incident) => {
+            const marker = this.markers[incident.id];
+            if (this.filteredIncidents.includes(incident)) {
+              marker.setOpacity(1);
+            } else {
+              marker.setOpacity(0.3);
+            }
+          });
+        },
+      };
+    }
+  </script>
+</body>
+
+</html>
