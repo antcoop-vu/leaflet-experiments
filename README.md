@@ -2,6 +2,12 @@
 
 A collection of interactive mapping applications built with Leaflet.js, demonstrating various use cases and design patterns for web-based mapping solutions.
 
+## 🌟 Quick Start
+
+**[🚀 View the Main Project Landing Page](./index.html)**
+
+Start exploring with the Bella Vista Restaurant contact map - the main demonstration of our interactive mapping capabilities.
+
 ## 🗺️ Project Overview
 
 This repository contains three distinct mapping experiments, each showcasing different aspects of Leaflet.js integration with modern web technologies:
