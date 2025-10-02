@@ -4,7 +4,7 @@ A collection of interactive mapping applications built with Leaflet.js, demonstr
 
 ## 🌟 Quick Start
 
-**[🚀 View the Main Project Landing Page](https://antcoop-vu.github.io/leaflet-experiments/contact-map/restaurant.html)**
+**[🚀 View the Main Project Landing Page](https://antcoop-vu.github.io/leaflet-experiments/restaurant.html)**
 
 Start exploring with the Bella Vista Restaurant contact map - the main demonstration of our interactive mapping capabilities.
 
@@ -20,7 +20,7 @@ This repository contains three distinct mapping experiments, each showcasing dif
 
 Click the links below to view each mapping experiment:
 
-- **[Restaurant Contact Map](https://antcoop-vu.github.io/leaflet-experiments/contact-map/restaurant.html)** - Bella Vista Restaurant location finder
+- **[Restaurant Contact Map](https://antcoop-vu.github.io/leaflet-experiments/restaurant.html)** - Bella Vista Restaurant location finder
 - **[Nashville Pizza Locations](https://antcoop-vu.github.io/leaflet-experiments/contact-map/nashville-pizza.html)** - Smoky Mountain Pizza Co. locator
 - **[Nashville Traffic Dashboard](https://antcoop-vu.github.io/leaflet-experiments/contact-map/nashville-traffic.html)** - Metro PD incident tracking
 
